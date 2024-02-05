@@ -6,3 +6,10 @@ Se busca realizar una implementación de la arquitectura CHIP-8 sobre una videoc
 Trabajo realizado por Ignacio Sainz de la Maza Martín.
 Doble Grado en Diseño y Desarrollo de Videojuegos + Ingeniería de Computadores
 Universidad Rey Juan Carlos
+
+
+Para compilar:
+```
+gcc play.c main.c -o chip8 -lGL -lGLU -lglut
+
+```
