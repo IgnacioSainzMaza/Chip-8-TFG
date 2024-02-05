@@ -39,7 +39,7 @@ uint8_t memory[MEMORY_SIZE];
 uint8_t V[16];
 uint16_t I;
 uint16_t PC;
-uint8_t gfx[DP_ROWS][DP_COLUMNS];
+uint8_t dp[DP_ROWS][DP_COLUMNS];
 uint8_t delay_timer;
 uint8_t sound_timer;
 uint16_t stack[STACK_SIZE];
@@ -47,7 +47,43 @@ uint16_t SP;
 uint8_t key[KEY_SIZE];
 bool chip8_draw_flag;
 
-void draw_sprite(uint8_t i, uint8_t i1, uint8_t n);
+void draw_sprite(uint8_t x, uint8_t y, uint8_t n) {
+    unsigned row = y, col = x;
+    unsigned byte_index;
+    unsigned bit_index;
+
+    V[0xF] = 0;
+    for (byte_index = 0; byte_index < n; byte_index++) {
+        uint8_t byte = memory[I + byte_index];
+
+        for (bit_index = 0; bit_index < 8; bit_index++) {
+            uint8_t bit = (byte >> bit_index) & 0x1; //value of bit in sprite
+            uint8_t *pixel = &dp[(row + byte_index) % DP_ROWS][(col + (7 - bit_index)) %
+                                                               DP_COLUMNS]; //value of pixel on screen
+            if (bit == 1 && *pixel == 1) V[0xF] = 1;  //Set ColisionFlag to 1 if any pixel would be erased.
+            *pixel = *pixel ^ bit; //Draw Pixel by XOR
+        }
+    }
+}
+
+static void print_state() {
+    printf("------------------------------------------------------------------\n");
+    printf("\n");
+
+    printf("V0: 0x%02x  V4: 0x%02x  V8: 0x%02x  VC: 0x%02x\n",
+           V[0], V[4], V[8], V[12]);
+    printf("V1: 0x%02x  V5: 0x%02x  V9: 0x%02x  VD: 0x%02x\n",
+           V[1], V[5], V[9], V[13]);
+    printf("V2: 0x%02x  V6: 0x%02x  VA: 0x%02x  VE: 0x%02x\n",
+           V[2], V[6], V[10], V[14]);
+    printf("V3: 0x%02x  V7: 0x%02x  VB: 0x%02x  VF: 0x%02x\n",
+           V[3], V[7], V[11], V[15]);
+
+    printf("\n");
+    printf("PC: 0x%04x\n", PC);
+    printf("\n");
+    printf("\n");
+}
 
 void chip_8_ini() {
     int i;
@@ -59,7 +95,7 @@ void chip_8_ini() {
 
     memset(memory, 0, sizeof(uint8_t) * MEMORY_SIZE);
     memset(V, 0, sizeof(uint8_t) * 16);
-    memset(gfx, 0, sizeof(uint8_t) * DP_SIZE);
+    memset(dp, 0, sizeof(uint8_t) * DP_SIZE);
     memset(stack, 0, sizeof(uint16_t) * STACK_SIZE);
     memset(key, 0, sizeof(uint8_t) * KEY_SIZE);
 
@@ -71,6 +107,32 @@ void chip_8_ini() {
     delay_timer = 0;
     sound_timer = 0;
     srand(time(NULL));
+}
+
+void chip_8_games(char *game) {
+    FILE *fgame;
+
+    fgame = fopen(game, "rb");
+    if (NULL == fgame) {
+        fprintf(stderr, "Cannot open game %s\n", game);
+        exit(42);
+    }
+
+    fread(&memory[0x200], 1, GAME_LIMIT_SIZE, fgame);
+    fclose(fgame);
+}
+
+void chip_8_tick() {
+    // update timers
+    if (delay_timer > 0) {
+        --delay_timer;
+    }
+    if (sound_timer > 0) {
+        --sound_timer;
+        if (sound_timer == 0) {
+            printf("BEEP!\n");
+        }
+    }
 }
 
 void chip_8_opcycle() {
@@ -96,7 +158,7 @@ void chip_8_opcycle() {
         case 0x0000:
             switch (kk) {
                 case 0x00E0: //CLS
-                    memset(gfx, 0, sizeof(uint8_t) * DP_SIZE);
+                    memset(dp, 0, sizeof(uint8_t) * DP_SIZE);
                     chip8_draw_flag = true;
                     PC += 2;
                     break;
@@ -242,35 +304,26 @@ void chip_8_opcycle() {
                     break;
                 case 0x33:
                     memory[I] = (V[x] % 1000) / 100;
-                    memory[I+1] = (V[x] % 100) / 10;
-                    memory[I+2] = (V[x] % 10); // Fx33 - LD B,Vx
-                    PC +=2;
+                    memory[I + 1] = (V[x] % 100) / 10;
+                    memory[I + 2] = (V[x] % 10); // Fx33 - LD B,Vx
+                    PC += 2;
                     break;
                 case 0x55:
-                    for(i=0; i<=x; i++){ memory[I+1] = V[i];}
-                    I += x+1;  // Fx55 - LD[I],Vx
-                    PC +=2;
+                    for (i = 0; i <= x; i++) { memory[I + 1] = V[i]; }
+                    I += x + 1;  // Fx55 - LD[I],Vx
+                    PC += 2;
                     break;
                 case 0x65:
-                    for(i=0; i<=x; i++){ V[i] = memory[I+1];}
-                    I += x+1;  // Fx55 - LD[I],Vx
-                    PC +=2;
+                    for (i = 0; i <= x; i++) { V[i] = memory[I + 1]; }
+                    I += x + 1;  // Fx55 - LD[I],Vx
+                    PC += 2;
                     break;
                 default:
                     unknown_opcode(opcode);
-
             }
             break;
-
     }
 
-
-
-    void draw_sprite(uint8_t i, uint8_t i1, uint8_t n) {
-
-    }
-
-}
 
 }
 
